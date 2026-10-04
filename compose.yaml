@@ -1,0 +1,29 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:?Configure VITE_SUPABASE_URL in .env}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:?Configure VITE_SUPABASE_PUBLISHABLE_KEY in .env}
+        VITE_CATALOG_SUPABASE_URL: ${VITE_CATALOG_SUPABASE_URL:?Configure VITE_CATALOG_SUPABASE_URL in .env}
+        VITE_CATALOG_SUPABASE_PUBLISHABLE_KEY: ${VITE_CATALOG_SUPABASE_PUBLISHABLE_KEY:?Configure VITE_CATALOG_SUPABASE_PUBLISHABLE_KEY in .env}
+    env_file:
+      - .env
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    restart: unless-stopped
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    environment:
+      TZ: America/Maceio
+      GENERIC_TIMEZONE: America/Maceio
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+volumes:
+  n8n_data:
