@@ -43,6 +43,11 @@ telas de produtos, clientes e pedidos. Preserve essa separação se os projetos
 Supabase forem diferentes. Reinicie o servidor de desenvolvimento após editar
 as variáveis.
 
+O login do SmartLar Hub usa o Supabase comercial (`VITE_CATALOG_SUPABASE_*`),
+pois é nele que as telas de clientes, produtos e pedidos consultam dados. Os
+usuários devem existir no Auth desse projeto para que o JWT satisfaça as
+políticas RLS. A sessão é mantida e renovada pelo cliente Supabase no navegador.
+
 Use somente uma chave pública **publishable** ou a chave legada **anon** nas
 variáveis `VITE_*`: elas ficam disponíveis no JavaScript enviado ao navegador.
 Senhas do banco, `service_role` e chaves `sb_secret_*` não devem ser usadas no
