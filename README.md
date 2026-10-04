@@ -55,6 +55,23 @@ Supabase. O script `database/002_rls.sql` concede acesso anônimo completo para 
 demonstração; use apenas dados fictícios enquanto essas políticas estiverem
 ativas. Antes de usar dados reais, configure autenticação e políticas restritas.
 
+## Docker
+
+Com as variáveis públicas do Supabase configuradas no `.env` conforme acima,
+inicie a aplicação e o n8n com:
+
+```sh
+docker compose up --build -d
+```
+
+A aplicação fica em `http://localhost:3000` e o n8n em
+`http://localhost:5678`. Use `APP_PORT` e `N8N_PORT` no `.env` para trocar as
+portas do host. As variáveis `VITE_*` entram no bundle durante o build; após
+alterá-las, execute `docker compose up --build -d` novamente. `SUPABASE_*`
+são fornecidas ao servidor em tempo de execução pelo `.env`. Ambos os clientes
+Supabase continuam apontando para os projetos na nuvem; o Compose não inicia
+um banco local. Os dados do n8n ficam no volume nomeado `n8n_data`.
+
 ## Built with
 
 - TanStack Start
