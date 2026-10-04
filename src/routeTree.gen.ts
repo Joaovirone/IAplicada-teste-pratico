@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as ClientesRouteImport } from './routes/clientes'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as NovoPedidoRouteImport } from './routes/novo-pedido'
 import { Route as PedidosRouteImport } from './routes/pedidos'
 import { Route as ProdutosRouteImport } from './routes/produtos'
@@ -29,6 +30,11 @@ const AgendaRoute = AgendaRouteImport.update({
 const ClientesRoute = ClientesRouteImport.update({
   id: '/clientes',
   path: '/clientes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NovoPedidoRoute = NovoPedidoRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/clientes': typeof ClientesRoute
+  '/login': typeof LoginRoute
   '/novo-pedido': typeof NovoPedidoRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/clientes': typeof ClientesRoute
+  '/login': typeof LoginRoute
   '/novo-pedido': typeof NovoPedidoRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/clientes': typeof ClientesRoute
+  '/login': typeof LoginRoute
   '/novo-pedido': typeof NovoPedidoRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
@@ -75,14 +84,28 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/agenda' | '/clientes' | '/novo-pedido' | '/pedidos' | '/produtos'
+    | '/'
+    | '/agenda'
+    | '/clientes'
+    | '/login'
+    | '/novo-pedido'
+    | '/pedidos'
+    | '/produtos'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/agenda' | '/clientes' | '/novo-pedido' | '/pedidos' | '/produtos'
+  to:
+    | '/'
+    | '/agenda'
+    | '/clientes'
+    | '/login'
+    | '/novo-pedido'
+    | '/pedidos'
+    | '/produtos'
   id:
     | '__root__'
     | '/'
     | '/agenda'
     | '/clientes'
+    | '/login'
     | '/novo-pedido'
     | '/pedidos'
     | '/produtos'
@@ -92,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgendaRoute: typeof AgendaRoute
   ClientesRoute: typeof ClientesRoute
+  LoginRoute: typeof LoginRoute
   NovoPedidoRoute: typeof NovoPedidoRoute
   PedidosRoute: typeof PedidosRoute
   ProdutosRoute: typeof ProdutosRoute
@@ -118,6 +142,13 @@ declare module '@tanstack/react-router' {
       path: '/clientes'
       fullPath: '/clientes'
       preLoaderRoute: typeof ClientesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/novo-pedido': {
@@ -148,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgendaRoute: AgendaRoute,
   ClientesRoute: ClientesRoute,
+  LoginRoute: LoginRoute,
   NovoPedidoRoute: NovoPedidoRoute,
   PedidosRoute: PedidosRoute,
   ProdutosRoute: ProdutosRoute,

@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -43,7 +43,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Sheet,
@@ -127,9 +126,11 @@ function OrdersPage() {
   const [updating, setUpdating] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [technicianId, setTechnicianId] = useState("");
-  const [installationDate, setInstallationDate] = useState<Date>();
+  const [installationDate, setInstallationDate] = useState("");
   const [scheduleError, setScheduleError] = useState("");
   const [cancelOpen, setCancelOpen] = useState(false);
+  const scheduleDate = installationDate ? new Date(installationDate) : null;
+  const scheduleReady = Boolean(technicianId && scheduleDate && !Number.isNaN(scheduleDate.getTime()) && scheduleDate.getTime() > Date.now());
 
   const selectedOrder = orders.find((order) => order.id === selectedId) ?? null;
   const filteredOrders = useMemo(
@@ -177,6 +178,7 @@ function OrdersPage() {
 
   async function changeStatus(target: OrderStatus, scheduling?: { technician: string; date: Date }) {
     if (!selectedOrder || updating) return;
+    if (target === "agendado" && (!scheduling || !schedulingSchema.safeParse({ tecnico_id: scheduling.technician, data_instalacao: scheduling.date }).success)) return;
     setUpdating(true);
     const { data: persisted, error: checkError } = await ordersClient
       .from("pedidos")
@@ -197,14 +199,13 @@ function OrdersPage() {
     const patch: { status: OrderStatus; tecnico_id?: string; data_instalacao?: string } = { status: target };
     if (scheduling) {
       patch.tecnico_id = scheduling.technician;
-      const dateAtNoon = new Date(scheduling.date);
-      dateAtNoon.setHours(12, 0, 0, 0);
-      patch.data_instalacao = dateAtNoon.toISOString();
+      patch.data_instalacao = scheduling.date.toISOString();
     }
-    const { error } = await ordersClient.from("pedidos").update(patch).eq("id", selectedOrder.id).eq("status", current);
-    if (error) {
+    const { data: changed, error } = await ordersClient.from("pedidos").update(patch).eq("id", selectedOrder.id).eq("status", current).select("id").maybeSingle();
+    if (error || !changed) {
       setUpdating(false);
-      toast.error("Não foi possível atualizar o pedido.");
+      toast.error("Não foi possível atualizar o pedido. Atualize a lista e tente novamente.");
+      await loadOrders();
       return;
     }
     const updated = await fetchUpdatedOrder(selectedOrder.id);
@@ -218,7 +219,7 @@ function OrdersPage() {
     setScheduleOpen(false);
     setCancelOpen(false);
     setTechnicianId("");
-    setInstallationDate(undefined);
+    setInstallationDate("");
     toast.success(target === "cancelado" ? "Pedido cancelado." : `Pedido atualizado para ${orderStatusLabels[target].toLowerCase()}.`);
   }
 
@@ -235,7 +236,7 @@ function OrdersPage() {
   }
 
   function handleSchedule() {
-    const parsed = schedulingSchema.safeParse({ tecnico_id: technicianId, data_instalacao: installationDate });
+    const parsed = schedulingSchema.safeParse({ tecnico_id: technicianId, data_instalacao: scheduleDate });
     if (!parsed.success) {
       setScheduleError(parsed.error.issues[0]?.message ?? "Preencha os dados do agendamento.");
       return;
@@ -355,7 +356,7 @@ function OrdersPage() {
 
                 <section className="grid gap-5 border-t border-border pt-6 sm:grid-cols-2" aria-label="Atendimento">
                   <div><h3 className="mb-2 text-xs font-extrabold uppercase text-muted-foreground">Técnico</h3><p className="flex items-start gap-2 text-sm font-bold text-foreground"><Wrench className="mt-0.5 size-4 text-primary" />{selectedOrder.tecnicos?.nome ?? "Não definido"}</p>{selectedOrder.tecnicos?.especialidade && <p className="mt-1 pl-6 text-xs text-muted-foreground">{selectedOrder.tecnicos.especialidade}</p>}</div>
-                  <div><h3 className="mb-2 text-xs font-extrabold uppercase text-muted-foreground">Instalação</h3><p className="flex items-start gap-2 text-sm font-bold text-foreground"><CalendarDays className="mt-0.5 size-4 text-primary" />{formatDate(selectedOrder.data_instalacao)}</p></div>
+                  <div><h3 className="mb-2 text-xs font-extrabold uppercase text-muted-foreground">Instalação</h3><p className="flex items-start gap-2 text-sm font-bold text-foreground"><CalendarDays className="mt-0.5 size-4 text-primary" />{formatDate(selectedOrder.data_instalacao, true)}</p></div>
                 </section>
 
                 <section className="border-t border-border pt-6" aria-labelledby="notes-detail-title">
@@ -368,7 +369,7 @@ function OrdersPage() {
                 {nextOrderStatus[selectedOrder.status] ? (
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Button className="flex-1" disabled={updating} onClick={handleAdvance}>{updating ? <LoaderCircle className="animate-spin" /> : selectedOrder.status === "em_andamento" ? <Check /> : <ArrowRight />}{nextActionLabels[selectedOrder.status]}</Button>
-                    <Button variant="outline" className="text-destructive hover:text-destructive" disabled={updating} onClick={() => setCancelOpen(true)}><X /> Cancelar pedido</Button>
+                    {canCancelOrder(selectedOrder.status) && <Button variant="outline" className="text-destructive hover:text-destructive" disabled={updating} onClick={() => setCancelOpen(true)}><X /> Cancelar pedido</Button>}
                   </div>
                 ) : (
                   <p className="flex items-center gap-2 text-sm font-bold text-muted-foreground"><Clock3 className="size-4" />Este pedido está em um status final.</p>
@@ -384,14 +385,14 @@ function OrdersPage() {
           <DialogHeader><DialogTitle>Agendar instalação</DialogTitle><DialogDescription>Defina o responsável e a data antes de avançar o pedido.</DialogDescription></DialogHeader>
           <div className="space-y-5 py-2">
             <div><Label htmlFor="technician">Técnico</Label><Select value={technicianId} onValueChange={(value) => { setTechnicianId(value); setScheduleError(""); }}><SelectTrigger id="technician" className="mt-2 w-full"><SelectValue placeholder="Selecione um técnico" /></SelectTrigger><SelectContent>{technicians.map((technician) => <SelectItem key={technician.id} value={technician.id}><span className="font-medium">{technician.nome}</span>{technician.especialidade ? ` — ${technician.especialidade}` : ""}</SelectItem>)}</SelectContent></Select></div>
-            <div><Label>Data da instalação</Label><Popover><PopoverTrigger asChild><Button type="button" variant="outline" className={cn("mt-2 w-full justify-start text-left font-normal", !installationDate && "text-muted-foreground")}><CalendarDays />{installationDate ? format(installationDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : "Selecione uma data"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={installationDate} onSelect={(date) => { setInstallationDate(date); setScheduleError(""); }} disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }} initialFocus className="pointer-events-auto p-3" /></PopoverContent></Popover></div>
+            <div><Label htmlFor="installation-datetime">Data e hora da instalação</Label><Input id="installation-datetime" type="datetime-local" className="mt-2 w-full" value={installationDate} onChange={(event) => { setInstallationDate(event.target.value); setScheduleError(""); }} /></div>
             {scheduleError && <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription>{scheduleError}</AlertDescription></Alert>}
           </div>
-          <DialogFooter><Button variant="outline" disabled={updating} onClick={() => setScheduleOpen(false)}>Voltar</Button><Button disabled={updating} onClick={handleSchedule}>{updating ? <LoaderCircle className="animate-spin" /> : <CalendarDays />} Confirmar agendamento</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" disabled={updating} onClick={() => setScheduleOpen(false)}>Voltar</Button><Button disabled={updating || !scheduleReady} onClick={handleSchedule}>{updating ? <LoaderCircle className="animate-spin" /> : <CalendarDays />} Confirmar agendamento</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={cancelOpen} onOpenChange={(open) => { if (!updating) setCancelOpen(open); }}>
+      <AlertDialog open={cancelOpen && Boolean(selectedOrder && canCancelOrder(selectedOrder.status))} onOpenChange={(open) => { if (!updating) setCancelOpen(open); }}>
         <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Cancelar este pedido?</AlertDialogTitle><AlertDialogDescription>Esta ação encerra o fluxo e o pedido não poderá voltar a um status anterior.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={updating}>Manter pedido</AlertDialogCancel><AlertDialogAction disabled={updating} onClick={(event) => { event.preventDefault(); void changeStatus("cancelado"); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{updating && <LoaderCircle className="animate-spin" />} Confirmar cancelamento</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
     </main>

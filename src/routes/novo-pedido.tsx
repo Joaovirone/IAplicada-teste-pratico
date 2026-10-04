@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { calculateCartTotal } from "@/lib/cart-total";
 import { type Product } from "@/lib/product-catalog";
 import { customerSchema, orderSchema, ordersClient, type Customer } from "@/lib/orders";
 
@@ -70,9 +71,9 @@ function NewOrderPage() {
     const product = productMap.get(line.produto_id);
     const quantity = Number(line.quantidade);
     const validQuantity = Number.isInteger(quantity) && quantity > 0 ? quantity : 0;
-    return { ...line, product, subtotal: product ? Number(product.preco_unitario) * validQuantity : 0 };
+    return { ...line, product, subtotal: product && validQuantity ? calculateCartTotal([{ quantidade: validQuantity, preco_unitario: Number(product.preco_unitario) }]) : 0 };
   }), [lines, productMap]);
-  const total = useMemo(() => calculatedLines.reduce((sum, line) => sum + line.subtotal, 0), [calculatedLines]);
+  const total = useMemo(() => calculateCartTotal(calculatedLines.filter((line) => line.product && line.subtotal > 0).map((line) => ({ quantidade: Number(line.quantidade), preco_unitario: Number(line.product!.preco_unitario) }))), [calculatedLines]);
 
   function updateLine(key: string, patch: Partial<OrderLine>) {
     setFormError("");
@@ -126,32 +127,16 @@ function NewOrderPage() {
     }
 
     setSaving(true);
-    const orderTotal = parsed.data.itens.reduce((sum, item) => sum + item.quantidade * item.preco_unitario, 0);
-    const { data: order, error: orderError } = await ordersClient.from("pedidos").insert({
-      cliente_id: parsed.data.cliente_id,
-      tecnico_id: null,
-      status: "orcamento",
-      valor_total: orderTotal,
-      observacoes: parsed.data.observacoes || null,
-    }).select("id").single();
-
-    if (orderError || !order) {
+    const orderTotal = calculateCartTotal(parsed.data.itens);
+    const { error } = await ordersClient.rpc("criar_pedido_completo", {
+      p_cliente_id: parsed.data.cliente_id,
+      p_valor_total: orderTotal,
+      p_observacoes: parsed.data.observacoes || null,
+      p_itens: parsed.data.itens,
+    });
+    if (error) {
       setSaving(false);
-      setFormError("Não foi possível salvar o orçamento.");
-      return;
-    }
-
-    const orderItems = parsed.data.itens.map((item) => ({
-      pedido_id: order.id,
-      produto_id: item.produto_id,
-      quantidade: item.quantidade,
-      preco_unitario: item.preco_unitario,
-    }));
-    const { error: itemsError } = await ordersClient.from("itens_pedido").insert(orderItems);
-    if (itemsError) {
-      await ordersClient.from("pedidos").delete().eq("id", order.id);
-      setSaving(false);
-      setFormError("Não foi possível salvar os itens. Nenhum orçamento incompleto foi mantido.");
+      setFormError("Não foi possível salvar o orçamento. Tente novamente.");
       return;
     }
 

@@ -4,17 +4,22 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useNavigate,
   useRouterState,
   HeadContent,
   Scripts,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { LoaderCircle, LogOut } from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { AuthProvider } from "@/components/auth-provider";
+import { useAuth } from "@/components/auth-context";
 import { Button } from "@/components/ui/button";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
@@ -126,7 +131,28 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  return <QueryClientProvider client={queryClient}><AuthProvider><ProtectedContent /></AuthProvider></QueryClientProvider>;
+}
+
+function ProtectedContent() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const navigate = useNavigate();
+  const { user, loading, signOut } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !user && pathname !== "/login") {
+      void navigate({ to: "/login", replace: true });
+    }
+    if (!loading && user && pathname === "/login") {
+      void navigate({ to: "/", replace: true });
+    }
+  }, [loading, navigate, pathname, user]);
+
+  if (loading || (pathname !== "/login" && !user) || (pathname === "/login" && user)) {
+    return <div className="flex min-h-svh items-center justify-center text-muted-foreground"><LoaderCircle className="mr-2 size-5 animate-spin" /> Carregando sessão...</div>;
+  }
+  if (pathname === "/login") return <Outlet />;
+
   const titles: Record<string, string> = {
     "/": "Dashboard",
     "/clientes": "Clientes",
@@ -137,7 +163,6 @@ function RootComponent() {
   };
 
   return (
-    <QueryClientProvider client={queryClient}>
       <SidebarProvider>
         <div className="flex min-h-svh w-full bg-background">
           <AppSidebar />
@@ -146,6 +171,7 @@ function RootComponent() {
               <SidebarTrigger aria-label="Abrir ou recolher menu" />
               <div className="h-5 w-px bg-border" />
               <span className="truncate text-sm font-bold text-foreground">{titles[pathname] ?? "SmartLar Hub"}</span>
+              <Button variant="ghost" size="sm" className="ml-auto" onClick={() => { void signOut().then(() => navigate({ to: "/login", replace: true })).catch(() => toast.error("Não foi possível encerrar a sessão.")); }}><LogOut /> Sair</Button>
             </header>
             <div className="flex-1">
               <Outlet />
@@ -154,6 +180,5 @@ function RootComponent() {
         </div>
         <Toaster position="top-right" richColors />
       </SidebarProvider>
-    </QueryClientProvider>
   );
 }

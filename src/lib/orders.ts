@@ -66,5 +66,8 @@ export const orderSchema = z.object({
 
 export const schedulingSchema = z.object({
   tecnico_id: z.string().uuid("Selecione um técnico."),
-  data_instalacao: z.date({ required_error: "Selecione a data de instalação." }),
+  data_instalacao: z.date({ required_error: "Selecione a data e hora de instalação." }).refine(
+    (date) => date.getTime() > Date.now(),
+    "Selecione uma data e hora futuras.",
+  ),
 });

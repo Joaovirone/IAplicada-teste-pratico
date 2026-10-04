@@ -33,8 +33,8 @@ function createCatalogClient() {
 
   return createClient(catalogUrl, catalogPublishableKey, {
     auth: {
-      persistSession: false,
-      autoRefreshToken: false,
+      persistSession: true,
+      autoRefreshToken: true,
     },
   });
 }

@@ -21,5 +21,5 @@ export function canAdvanceOrderStatus(current: OrderStatus, target: OrderStatus)
 }
 
 export function canCancelOrder(current: OrderStatus) {
-  return current !== "concluido" && current !== "cancelado";
+  return current === "orcamento" || current === "aprovado";
 }
