@@ -7,6 +7,7 @@ import {
   Package,
   ShoppingCart,
   Users,
+  Wrench,
 } from "lucide-react";
 
 import {
@@ -26,6 +27,7 @@ import {
 const navigation = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Clientes", url: "/clientes", icon: Users },
+  { title: "Técnicos", url: "/tecnicos", icon: Wrench },
   { title: "Produtos", url: "/produtos", icon: Package },
   { title: "Novo Pedido", url: "/novo-pedido", icon: ShoppingCart },
   { title: "Gestão de Pedidos", url: "/pedidos", icon: ClipboardList },

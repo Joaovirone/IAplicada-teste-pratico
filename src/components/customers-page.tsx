@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState, type FormEvent } from "react";
-import { ChevronRight, LoaderCircle, Plus, ReceiptText, Search, Users } from "lucide-react";
+import { ChevronRight, LoaderCircle, Plus, ReceiptText, Search, Pencil, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   createCustomer,
+  updateCustomer,
   fetchCustomerOrders,
   fetchCustomers,
   matchesCustomer,
@@ -42,6 +43,7 @@ import {
   type NewCustomer,
 } from "@/lib/customers";
 import { orderStatusLabels } from "@/lib/order-status";
+import { formatPhone } from "@/lib/phone";
 
 const customersKey = ["customers"] as const;
 const emptyForm: NewCustomer = { nome: "", telefone: "", email: "", endereco: "" };
@@ -55,6 +57,7 @@ export function CustomersPage() {
   const [form, setForm] = useState<NewCustomer>(emptyForm);
   const [formError, setFormError] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRecord | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState<CustomerRecord | null>(null);
   const submitting = useRef(false);
   const customerTrigger = useRef<HTMLButtonElement | null>(null);
 
@@ -63,9 +66,11 @@ export function CustomersPage() {
     queryFn: ({ signal }) => fetchCustomers(signal),
     retry: false,
   });
-  const createMutation = useMutation({
-    mutationFn: createCustomer,
-    onSuccess: (customer) => {
+  const saveMutation = useMutation({
+    mutationFn: ({ input, id }: { input: NewCustomer; id?: string }) =>
+      id ? updateCustomer(id, input) : createCustomer(input),
+    onSuccess: async (customer, { id }) => {
+      await queryClient.cancelQueries({ queryKey: customersKey });
       queryClient.setQueryData<CustomerRecord[]>(customersKey, (current = []) =>
         [...current.filter((item) => item.id !== customer.id), customer].sort((a, b) =>
           a.nome.localeCompare(b.nome, "pt-BR"),
@@ -74,12 +79,16 @@ export function CustomersPage() {
       setCreateOpen(false);
       setForm(emptyForm);
       setSearch("");
-      toast.success("Cliente cadastrado com sucesso.");
+      setEditingCustomer(null);
+      if (selectedCustomer?.id === customer.id) setSelectedCustomer(customer);
+      toast.success(id ? "Cliente atualizado com sucesso." : "Cliente cadastrado com sucesso.");
       void queryClient.invalidateQueries({ queryKey: customersKey });
     },
-    onError: () => {
+    onError: (_error, { id }) => {
       setFormError(
-        "Não foi possível cadastrar o cliente. Verifique sua conexão e tente novamente.",
+        id
+          ? "Não foi possível atualizar o cliente. Verifique sua conexão e tente novamente."
+          : "Não foi possível cadastrar o cliente. Verifique sua conexão e tente novamente.",
       );
     },
     onSettled: () => {
@@ -90,7 +99,6 @@ export function CustomersPage() {
     () => (customersQuery.data ?? []).filter((customer) => matchesCustomer(customer, search)),
     [customersQuery.data, search],
   );
-
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting.current) return;
@@ -101,7 +109,10 @@ export function CustomersPage() {
       return;
     }
     submitting.current = true;
-    createMutation.mutate(parsed.data);
+    saveMutation.mutate({
+      input: parsed.data,
+      ...(editingCustomer ? { id: editingCustomer.id } : {}),
+    });
   }
 
   return (
@@ -120,27 +131,32 @@ export function CustomersPage() {
             if (submitting.current) return;
             setCreateOpen(open);
             setFormError("");
-            if (!open) setForm(emptyForm);
+            if (!open) {
+              setForm(emptyForm);
+              setEditingCustomer(null);
+            }
           }}
         >
           <DialogTrigger asChild>
-            <Button>
+            <Button
+              onClick={() => {
+                setEditingCustomer(null);
+                setForm(emptyForm);
+                setFormError("");
+              }}
+            >
               <Plus aria-hidden="true" /> Novo Cliente
             </Button>
           </DialogTrigger>
           <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Novo Cliente</DialogTitle>
+              <DialogTitle>{editingCustomer ? "Editar Cliente" : "Novo Cliente"}</DialogTitle>
               <DialogDescription>
                 Informe os dados de contato e o endereço da instalação. O e-mail é opcional.
               </DialogDescription>
             </DialogHeader>
-            <form
-              className="space-y-4"
-              onSubmit={handleSubmit}
-              aria-busy={createMutation.isPending}
-            >
-              <fieldset className="space-y-4" disabled={createMutation.isPending}>
+            <form className="space-y-4" onSubmit={handleSubmit} aria-busy={saveMutation.isPending}>
+              <fieldset className="space-y-4" disabled={saveMutation.isPending}>
                 <div className="space-y-2">
                   <Label htmlFor="client-name">Nome</Label>
                   <Input
@@ -160,10 +176,13 @@ export function CustomersPage() {
                     type="tel"
                     autoComplete="tel"
                     required
-                    maxLength={30}
-                    placeholder="(11) 99999-9999"
+                    maxLength={15}
+                    inputMode="tel"
+                    placeholder="(82) 98765-4321"
                     value={form.telefone}
-                    onChange={(event) => setForm({ ...form, telefone: event.target.value })}
+                    onChange={(event) =>
+                      setForm({ ...form, telefone: formatPhone(event.target.value) })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -203,7 +222,7 @@ export function CustomersPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={createMutation.isPending}
+                  disabled={saveMutation.isPending}
                   onClick={() => {
                     setCreateOpen(false);
                     setForm(emptyForm);
@@ -212,13 +231,13 @@ export function CustomersPage() {
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? (
+                <Button type="submit" disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? (
                     <LoaderCircle className="animate-spin" aria-hidden="true" />
                   ) : (
                     <Plus aria-hidden="true" />
                   )}
-                  {createMutation.isPending ? "Salvando..." : "Salvar cliente"}
+                  {saveMutation.isPending ? "Salvando..." : "Salvar cliente"}
                 </Button>
               </DialogFooter>
             </form>
@@ -302,6 +321,7 @@ export function CustomersPage() {
                 <TableHead>
                   <span className="sr-only">Pedidos</span>
                 </TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -323,7 +343,9 @@ export function CustomersPage() {
                       {customer.nome}
                     </button>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap">{customer.telefone || "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {formatPhone(customer.telefone ?? "") || "—"}
+                  </TableCell>
                   <TableCell className="break-all text-muted-foreground">
                     {customer.email || "—"}
                   </TableCell>
@@ -332,6 +354,28 @@ export function CustomersPage() {
                   </TableCell>
                   <TableCell>
                     <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Editar ${customer.nome}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setEditingCustomer(customer);
+                        setForm({
+                          nome: customer.nome,
+                          telefone: formatPhone(customer.telefone ?? ""),
+                          email: customer.email ?? "",
+                          endereco: customer.endereco ?? "",
+                        });
+                        setFormError("");
+                        setCreateOpen(true);
+                      }}
+                    >
+                      <Pencil aria-hidden="true" /> Editar
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -377,7 +421,7 @@ function CustomerOrders({ customer }: { customer: CustomerRecord }) {
       <dl className="space-y-3 border border-border bg-card p-4 text-sm">
         <div>
           <dt className="text-xs text-muted-foreground">Telefone</dt>
-          <dd className="mt-1">{customer.telefone || "—"}</dd>
+          <dd className="mt-1">{formatPhone(customer.telefone ?? "") || "—"}</dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">E-mail</dt>

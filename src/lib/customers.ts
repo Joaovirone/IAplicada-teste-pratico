@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { customerSchema, ordersClient, type Customer, type OrderStatus } from "@/lib/orders";
+import { phoneSchema } from "@/lib/phone";
 
 export type CustomerRecord = Customer & { created_at: string };
 export type CustomerOrder = {
@@ -11,10 +12,7 @@ export type CustomerOrder = {
 };
 
 export const newCustomerSchema = customerSchema.extend({
-  telefone: customerSchema.shape.telefone.refine(
-    (value) => value.replace(/\D/g, "").length >= 8,
-    "Informe um telefone válido, com pelo menos 8 dígitos.",
-  ),
+  telefone: phoneSchema,
   email: z.string().trim().max(255).email("Informe um e-mail válido.").or(z.literal("")),
 });
 export type NewCustomer = z.infer<typeof newCustomerSchema>;
@@ -49,6 +47,19 @@ export async function createCustomer(input: NewCustomer): Promise<CustomerRecord
     .single();
   if (error) throw error;
   if (!data) throw new Error("O cadastro não retornou os dados do cliente.");
+  return data as CustomerRecord;
+}
+
+export async function updateCustomer(id: string, input: NewCustomer): Promise<CustomerRecord> {
+  const values = newCustomerSchema.parse(input);
+  const { data, error } = await ordersClient
+    .from("clientes")
+    .update({ ...values, email: values.email || null })
+    .eq("id", id)
+    .select(customerColumns)
+    .single();
+  if (error) throw error;
+  if (!data) throw new Error("Cliente não encontrado ou edição não autorizada.");
   return data as CustomerRecord;
 }
 

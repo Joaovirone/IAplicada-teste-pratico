@@ -6,12 +6,12 @@ import { toast } from "sonner";
 import { CustomersPage } from "@/components/customers-page";
 import type { CustomerRecord, NewCustomer } from "@/lib/customers";
 
-vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const joao: CustomerRecord = {
   id: "11111111-1111-4111-8111-111111111111",
   nome: "João da Silva",
-  telefone: "(11) 97777-4321",
+  telefone: "11977774321",
   email: "joao@example.test",
   endereco: "Rua das Flores, 10",
   created_at: "2026-10-01T12:00:00Z",
@@ -41,6 +41,7 @@ const fetchMock = vi.fn<typeof fetch>();
 let listReply: () => Reply;
 let insertReply: (body: NewCustomer) => Reply;
 let ordersReply: (url: URL) => Reply;
+let updateReply: (body: NewCustomer) => Reply;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -97,6 +98,7 @@ beforeEach(() => {
   listReply = () => json([ana, joao]);
   insertReply = () => json(julia, 201);
   ordersReply = () => json([]);
+  updateReply = (body) => json({ ...joao, ...body });
   fetchMock.mockImplementation(async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
     const method = init?.method ?? (input instanceof Request ? input.method : "GET");
@@ -108,6 +110,8 @@ beforeEach(() => {
     if (url.pathname === "/rest/v1/clientes" && method === "GET") return listReply();
     if (url.pathname === "/rest/v1/clientes" && method === "POST")
       return insertReply(body as NewCustomer);
+    if (url.pathname === "/rest/v1/clientes" && method === "PATCH")
+      return updateReply(body as NewCustomer);
     if (url.pathname === "/rest/v1/pedidos" && method === "GET") return ordersReply(url);
     throw new Error(`Unexpected request: ${method} ${url.pathname}`);
   });
@@ -122,6 +126,67 @@ afterEach(() => {
 });
 
 describe("Clientes", () => {
+  it("limita e mascara o telefone e rejeita números repetidos antes de enviar", async () => {
+    renderPage();
+    const dialog = await openForm();
+    const phone = within(dialog).getByLabelText("Telefone");
+    fireEvent.change(phone, { target: { value: "abc8298765432112345" } });
+    expect(phone).toHaveValue("(82) 98765-4321");
+    expect(phone).toHaveAttribute("maxlength", "15");
+    fireEvent.change(phone, { target: { value: "82900000000" } });
+    fireEvent.submit(
+      within(dialog).getByRole("button", { name: "Salvar cliente" }).closest("form")!,
+    );
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "sem sequência de dígitos repetidos",
+    );
+    expect(requests.filter((request) => request.method === "POST")).toHaveLength(0);
+  });
+
+  it("formata telefones antigos, edita por id e não oferece exclusão", async () => {
+    renderPage();
+    const edit = await screen.findByRole("button", { name: `Editar ${joao.nome}` });
+    expect(screen.getByText("(11) 97777-4321")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Excluir/ })).not.toBeInTheDocument();
+    fireEvent.click(edit);
+    const dialog = await screen.findByRole("dialog", { name: "Editar Cliente" });
+    expect(
+      screen.queryByRole("dialog", { name: `Pedidos de ${joao.nome}` }),
+    ).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Nome")).toHaveValue(joao.nome);
+    expect(within(dialog).getByLabelText("Telefone")).toHaveValue("(11) 97777-4321");
+    expect(within(dialog).getByLabelText("E-mail (opcional)")).toHaveValue(joao.email);
+    expect(within(dialog).getByLabelText("Endereço")).toHaveValue(joao.endereco);
+    fireEvent.change(within(dialog).getByLabelText("Nome"), {
+      target: { value: "João Atualizado" },
+    });
+    listReply = () => json([ana, { ...joao, nome: "João Atualizado" }]);
+    fireEvent.submit(
+      within(dialog).getByRole("button", { name: "Salvar cliente" }).closest("form")!,
+    );
+    expect(await screen.findByRole("button", { name: "Editar João Atualizado" })).toBeVisible();
+    const update = requests.find((request) => request.method === "PATCH");
+    expect(update?.url.searchParams.get("id")).toBe(`eq.${joao.id}`);
+    expect(update?.body).toMatchObject({ nome: "João Atualizado", telefone: "(11) 97777-4321" });
+    expect(toast.success).toHaveBeenCalledWith("Cliente atualizado com sucesso.");
+    expect(requests.some((request) => request.method === "DELETE")).toBe(false);
+  });
+
+  it("mantém o formulário de edição se o Supabase rejeitar o UPDATE", async () => {
+    updateReply = () => json({ code: "42501", message: "Permission denied" }, 403);
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: `Editar ${joao.nome}` }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar Cliente" });
+    fireEvent.submit(
+      within(dialog).getByRole("button", { name: "Salvar cliente" }).closest("form")!,
+    );
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Não foi possível atualizar o cliente.",
+    );
+    expect(within(dialog).getByLabelText("Nome")).toHaveValue(joao.nome);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
   it("carrega clientes e busca nomes sem acentos ou telefones sem máscara", async () => {
     const pending = deferred<Response>();
     listReply = () => pending.promise;

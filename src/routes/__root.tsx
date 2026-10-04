@@ -156,6 +156,7 @@ function ProtectedContent() {
   const titles: Record<string, string> = {
     "/": "Dashboard",
     "/clientes": "Clientes",
+    "/tecnicos": "Técnicos",
     "/produtos": "Produtos",
     "/novo-pedido": "Novo Pedido",
     "/pedidos": "Gestão de Pedidos",

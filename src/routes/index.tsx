@@ -10,12 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ordersClient, type OrderStatus } from "@/lib/orders";
+import { useAuth } from "@/components/auth-context";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
-    { title: "Dashboard do Rafael — SmartLar Hub" },
+    { title: "Dashboard — SmartLar Hub" },
     { name: "description", content: "Indicadores comerciais, próximas instalações e orçamentos da SmartLar Hub." },
-    { property: "og:title", content: "Dashboard do Rafael — SmartLar Hub" },
+    { property: "og:title", content: "Dashboard — SmartLar Hub" },
     { property: "og:description", content: "Indicadores comerciais, próximas instalações e orçamentos da SmartLar Hub." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },
@@ -46,6 +47,7 @@ function MetricCard({ label, value, detail, icon }: { label: string; value: stri
 }
 
 function Dashboard() {
+  const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState<DashboardOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -90,8 +92,8 @@ function Dashboard() {
     <main className="mx-auto w-full max-w-7xl px-5 py-8 sm:px-8 lg:py-10">
       <header className="border-b border-border pb-7">
         <p className="mb-2 text-xs font-bold uppercase text-primary">Visão geral</p>
-        <h1 className="text-3xl font-extrabold text-foreground sm:text-4xl">Dashboard do Rafael</h1>
-        <p className="mt-3 text-sm text-muted-foreground">Resumo comercial e prioridades da operação.</p>
+        <h1 className="text-3xl font-extrabold text-foreground sm:text-4xl">{!authLoading && user?.email ? `Olá, ${user.email}!` : "Bem-vindo(a) à sua Dashboard!"}</h1>
+        <p className="mt-3 text-sm text-muted-foreground">Acompanhe o seu Resumo Comercial e as prioridades da operação.</p>
       </header>
 
       {loadError ? (
