@@ -22,7 +22,7 @@ create table if not exists public.produtos (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
   categoria text not null,
-  preco_unitario numeric(12,2) not null check (preco_unitario >= 0),
+  preco_unitario numeric not null check (preco_unitario >= 0::numeric),
   descricao text,
   ativo boolean not null default true,
   created_at timestamptz not null default now()
@@ -33,25 +33,23 @@ create table if not exists public.pedidos (
   tecnico_id uuid references public.tecnicos(id),
   status text not null default 'orcamento' check (status in ('orcamento','aprovado','agendado','em_andamento','concluido','cancelado')),
   data_instalacao timestamptz,
-  valor_total numeric(12,2) not null default 0 check (valor_total >= 0),
+  valor_total numeric not null default 0 check (valor_total >= 0::numeric),
   forma_pagamento text,
   observacoes text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint agenda_necessaria check (status not in ('agendado','em_andamento','concluido') or (tecnico_id is not null and data_instalacao is not null))
+  updated_at timestamptz not null default now()
 );
 create table if not exists public.itens_pedido (
   id uuid primary key default gen_random_uuid(),
-  pedido_id uuid not null references public.pedidos(id) on delete cascade,
+  pedido_id uuid not null references public.pedidos(id),
   produto_id uuid not null references public.produtos(id),
   quantidade integer not null check (quantidade > 0),
-  preco_unitario numeric(12,2) not null check (preco_unitario >= 0),
-  subtotal numeric(12,2) generated always as (quantidade * preco_unitario) stored,
-  unique(pedido_id, produto_id)
+  preco_unitario numeric not null check (preco_unitario >= 0::numeric),
+  subtotal numeric default ((quantidade)::numeric * preco_unitario)
 );
 create table if not exists public.historico_status (
   id bigint generated always as identity primary key,
-  pedido_id uuid not null references public.pedidos(id) on delete cascade,
+  pedido_id uuid not null references public.pedidos(id),
   status_anterior text,
   status_novo text not null,
   changed_at timestamptz not null default now()
