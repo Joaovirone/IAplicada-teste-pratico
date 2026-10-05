@@ -1,0 +1,216 @@
+{
+  "name": "Pedidos em Orçamento para Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "name",
+          "value": "public"
+        },
+        "tableName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "pedidos"
+        },
+        "additionalFields": {},
+        "options": {}
+      },
+      "id": "45958e4e-61ee-4d50-b77f-8582225cc462",
+      "name": "Novo Pedido (INSERT)",
+      "type": "n8n-nodes-base.postgresTrigger",
+      "typeVersion": 1,
+      "position": [
+        176,
+        96
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "rzTFhniLi0BtNmv0",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ ($json.payload ?? $json).status }}",
+              "rightValue": "orcamento",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "607461ce-73fe-4b32-bb9d-71c4305e4f57"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "eaee9800-8bbf-48d1-8187-238b63e3cccf",
+      "name": "Status é Orçamento?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT c.nome, $2::numeric AS valor_total, to_char($3::timestamptz AT TIME ZONE 'America/Maceio', 'DD/MM/YYYY HH24:MI') AS data_pedido FROM public.clientes c WHERE c.id = $1::uuid;",
+        "options": {
+          "queryReplacement": "={{ [($json.payload ?? $json).cliente_id, ($json.payload ?? $json).valor_total, ($json.payload ?? $json).created_at ?? ($json.payload ?? $json).data_pedido] }}"
+        }
+      },
+      "id": "3f638977-970f-40d3-be0f-d1878f95946f",
+      "name": "Buscar Cliente",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        672,
+        96
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "rzTFhniLi0BtNmv0",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1ssuzSZ9n8CZfWrPhyNZDq0HJSNRYm3M0TIqYNSrDFI0/edit?hl=pt-br&gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "orcamento",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ssuzSZ9n8CZfWrPhyNZDq0HJSNRYm3M0TIqYNSrDFI0/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nome": "={{ $json.nome }}",
+            "valor_total": "={{ Number($json.valor_total) }}",
+            "data_pedido": "={{ $json.data_pedido }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "nome",
+              "displayName": "nome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "valor_total",
+              "displayName": "valor_total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "data_pedido",
+              "displayName": "data_pedido",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "fe2e180b-f29d-4afb-acf6-fd58ed08442d",
+      "name": "Salvar na Planilha",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        96
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PTKox9Vv4g4pNfpQ",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Novo Pedido (INSERT)": {
+      "main": [
+        [
+          {
+            "node": "Status é Orçamento?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status é Orçamento?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Cliente": {
+      "main": [
+        [
+          {
+            "node": "Salvar na Planilha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "aa39533e-d003-4533-ba58-e1ca134568d7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a0f60be42b25a27bcfd29461815e5a7668539ed544c6229db3153affc4b81958"
+  },
+  "nodeGroups": [],
+  "id": "GecWWLG4eAfUYyJj",
+  "tags": []
+}

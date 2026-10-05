@@ -1,0 +1,268 @@
+{
+  "name": "Agenda Diária de Instalações",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "d86d5523-fad8-4cff-bc6a-4e595d5d9045",
+      "name": "Todo Dia às 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH limites AS (\n  SELECT (now() AT TIME ZONE 'America/Maceio')::date + 1 AS dia\n)\nSELECT\n  p.id AS pedido_id,\n  c.nome AS cliente_nome,\n  c.endereco AS cliente_endereco,\n  COALESCE(t.nome, 'Técnico não definido') AS tecnico_nome,\n  to_char(p.data_instalacao AT TIME ZONE 'America/Maceio', 'DD/MM/YYYY') AS data,\n  to_char(p.data_instalacao AT TIME ZONE 'America/Maceio', 'HH24:MI') AS horario\nFROM public.pedidos p\nJOIN public.clientes c ON c.id = p.cliente_id\nLEFT JOIN public.tecnicos t ON t.id = p.tecnico_id\nCROSS JOIN limites l\nWHERE p.status = 'agendado'\n  AND p.data_instalacao >= (l.dia::timestamp AT TIME ZONE 'America/Maceio')\n  AND p.data_instalacao < ((l.dia + 1)::timestamp AT TIME ZONE 'America/Maceio')\nORDER BY p.data_instalacao, t.nome;",
+        "options": {}
+      },
+      "id": "7971ba6f-3bef-4f6f-ade1-99f09e9ea875",
+      "name": "Buscar Instalações de Amanhã",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "rzTFhniLi0BtNmv0",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.pedido_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "id": "9b8b648b-89be-4475-9d8a-0a61af06fa9d"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "3ed23675-7d5c-4943-8800-58d9970f32ef",
+      "name": "Tem Instalações?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cliente",
+              "name": "Cliente",
+              "value": "={{ $json.cliente_nome }}",
+              "type": "string"
+            },
+            {
+              "id": "endereco",
+              "name": "Endereço",
+              "value": "={{ $json.cliente_endereco }}",
+              "type": "string"
+            },
+            {
+              "id": "tecnico",
+              "name": "Técnico",
+              "value": "={{ $json.tecnico_nome }}",
+              "type": "string"
+            },
+            {
+              "id": "horario",
+              "name": "Horário",
+              "value": "={{ $json.data }} {{ $json.horario }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "de71e5ce-d9ea-4a42-b3a1-c5d39c9f31e0",
+      "name": "Formatar Agenda",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        688,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1ssuzSZ9n8CZfWrPhyNZDq0HJSNRYm3M0TIqYNSrDFI0/edit?hl=pt-br&gid=1096037835#gid=1096037835",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1096037835,
+          "mode": "list",
+          "cachedResultName": "agenda",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ssuzSZ9n8CZfWrPhyNZDq0HJSNRYm3M0TIqYNSrDFI0/edit#gid=1096037835"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Cliente": "={{ $json.Cliente }}",
+            "Endereço": "={{ $json['Endereço'] }}",
+            "Técnico": "={{ $json['Técnico'] }}",
+            "Horário": "={{ $json['Horário'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Cliente",
+              "displayName": "Cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Endereço",
+              "displayName": "Endereço",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Técnico",
+              "displayName": "Técnico",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Horário",
+              "displayName": "Horário",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "5f31d391-bec9-4942-b10c-57a2dce24ca0",
+      "name": "Salvar Agenda na Planilha",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PTKox9Vv4g4pNfpQ",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Todo Dia às 08:00": {
+      "main": [
+        [
+          {
+            "node": "Buscar Instalações de Amanhã",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Instalações de Amanhã": {
+      "main": [
+        [
+          {
+            "node": "Tem Instalações?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem Instalações?": {
+      "main": [
+        [
+          {
+            "node": "Formatar Agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Agenda": {
+      "main": [
+        [
+          {
+            "node": "Salvar Agenda na Planilha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timezone": "America/Maceio"
+  },
+  "versionId": "c6ec2fcd-8432-425e-adbd-371a6bec01fe",
+  "meta": {
+    "instanceId": "a0f60be42b25a27bcfd29461815e5a7668539ed544c6229db3153affc4b81958"
+  },
+  "nodeGroups": [],
+  "id": "Cd6SM4u8LBWyHo1R",
+  "tags": []
+}

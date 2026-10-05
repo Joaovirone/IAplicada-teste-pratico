@@ -1,0 +1,194 @@
+{
+  "name": "Pedidos Concluídos para Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerMode": "listenTrigger",
+        "channelName": "pedidos_status_change",
+        "options": {}
+      },
+      "id": "e8a05577-06bf-421f-a59e-c77540fa5029",
+      "name": "Pedido Atualizado",
+      "type": "n8n-nodes-base.postgresTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "rzTFhniLi0BtNmv0",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ typeof $json.payload?.old_status === 'string' ? $json.payload.old_status : 'concluido' }}",
+              "rightValue": "concluido",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "id": "2677be50-ba5c-4638-9fc0-426271a377ee"
+            },
+            {
+              "leftValue": "={{ $json.payload?.new?.status ?? '' }}",
+              "rightValue": "concluido",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "c4a28474-0de8-4ec7-8a33-367fe054f26d"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "787b9d30-1e32-4de3-a67b-9481088910a3",
+      "name": "Mudou para Concluído?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1ssuzSZ9n8CZfWrPhyNZDq0HJSNRYm3M0TIqYNSrDFI0/edit?hl=pt-br&gid=1969313303#gid=1969313303",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1969313303,
+          "mode": "list",
+          "cachedResultName": "pedidos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ssuzSZ9n8CZfWrPhyNZDq0HJSNRYm3M0TIqYNSrDFI0/edit#gid=1969313303"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "valor_total": "={{ $('Pedido Atualizado').item.json.payload.new.valor_total }}",
+            "cliente_id": "={{ $('Pedido Atualizado').item.json.payload.new.cliente_id }}",
+            "data": "={{ $now }}",
+            "forma_pagamento": "={{ $('Pedido Atualizado').item.json.payload.new.forma_pagamento }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cliente_id",
+              "displayName": "cliente_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "valor_total",
+              "displayName": "valor_total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "forma_pagamento",
+              "displayName": "forma_pagamento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "6eefc525-453b-43c6-b3f2-ac332be4655e",
+      "name": "Registrar Pedido Concluído",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        464,
+        -16
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PTKox9Vv4g4pNfpQ",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Pedido Atualizado": {
+      "main": [
+        [
+          {
+            "node": "Mudou para Concluído?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mudou para Concluído?": {
+      "main": [
+        [
+          {
+            "node": "Registrar Pedido Concluído",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timezone": "America/Maceio"
+  },
+  "versionId": "f26795ff-5bb3-4e5f-a7ae-567e1cff81ba",
+  "meta": {
+    "instanceId": "a0f60be42b25a27bcfd29461815e5a7668539ed544c6229db3153affc4b81958"
+  },
+  "nodeGroups": [],
+  "id": "0jCZXrjjzpNhpDez",
+  "tags": []
+}
